@@ -25,5 +25,16 @@ def index():
     check_boatrace_and_notify()
     return "OK", 200
 
+@app.route("/healthz", methods=["GET"])
+def health_check():
+    return "OK", 200
+
+@app.route("/", methods=["GET"])
+def index():
+    # Cron から呼ばれるときだけ通知したい場合は、
+    # ヘッダやクエリで判定を入れるとさらに安全です。
+    check_boatrace_and_notify()
+    return "Notified", 200
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))

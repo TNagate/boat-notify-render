@@ -13,7 +13,7 @@ TZ = pytz.timezone("Asia/Tokyo")
 
 def check_boatrace_and_notify():
     today = datetime.now(TZ).strftime("%Y-%m-%d")
-    url = "https://www.boatrace.jp/owpc/pc/race/racelist?jcd=08"
+    url = "https://www.boatrace.jp/owpc/pc/race/pay"
     res = requests.get(url)
     soup = BeautifulSoup(res.text, "html.parser")
     has_race = bool(soup.select_one(".is-race"))

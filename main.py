@@ -14,24 +14,24 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 # ────────────────────────────────────────
-#  Flask アプリ
+#  Flask app
 # ────────────────────────────────────────
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
 # ────────────────────────────────────────
-#  LINE 設定
+#  LINE credentials
 # ────────────────────────────────────────
 line_api = LineBotApi(os.getenv("LINE_CHANNEL_ACCESS_TOKEN"))
 USER_ID = os.getenv("TARGET_USER_ID")
 
 # ────────────────────────────────────────
-#  タイムゾーン
+#  Timezone
 # ────────────────────────────────────────
 TZ = pytz.timezone("Asia/Tokyo")
 
 # ────────────────────────────────────────
-#  requests 再試行ヘルパ
+#  Retry‑enabled requests session
 # ────────────────────────────────────────
 def requests_retry_session(
     retries: int = 3,
@@ -52,28 +52,26 @@ def requests_retry_session(
     return session
 
 # ────────────────────────────────────────
-#  メイン処理
+#  Main logic
 # ────────────────────────────────────────
 def check_boatrace_and_notify() -> None:
-    now = datetime.now(TZ)
-    today_human = now.strftime("%Y-%m-%d")       # 2025-05-03
-    hd_param = now.strftime("%Y%m%d")            # 20250503
+    today_dt = datetime.now(TZ)
+    today_human = today_dt.strftime("%Y-%m-%d")   # 2025‑05‑03
 
-    # 22 = 福岡場コード ＋ 開催日パラメータ
-    url = f"https://www.boatrace.jp/owpc/pc/race/racelist?jcd=22&hd={hd_param}"
+    url = "https://www.boatrace.jp/owpc/pc/race/pay"
 
     try:
-        res = requests_retry_session().get(url, timeout=20)
+        res = requests_retry_session().get(url, timeout=30)
         res.raise_for_status()
     except Exception as e:
         app.logger.error(f"scraping failed: {type(e).__name__} {e}")
-        return  # スクレイピング失敗時は通知しない
+        return
 
     soup = BeautifulSoup(res.text, "html.parser")
-    # 開催中なら .is-holding が存在
-    has_race = bool(soup.select_one(".is-holding"))
+    # ページ全文に福岡が含まれるか
+    has_race = "福岡" in soup.get_text()
 
-    # ── 重複送信抑止（30 分同じ状態ならスキップ）
+    # ── 30 分以内の重複送信を抑止 ──
     cache_path = "/tmp/boat_cache.txt"
     msg_state = "1" if has_race else "0"
     if os.path.exists(cache_path):
@@ -83,7 +81,7 @@ def check_boatrace_and_notify() -> None:
     with open(cache_path, "w") as f:
         f.write(f"{msg_state},{time.time()}")
 
-    # ── LINE 送信
+    # ── LINE 送信 ──
     msg = f"{today_human} の福岡競艇：" + ("開催あり 🎉" if has_race else "開催なし ❌")
     try:
         line_api.push_message(USER_ID, TextSendMessage(text=msg))
@@ -92,7 +90,7 @@ def check_boatrace_and_notify() -> None:
         app.logger.error(f"LINE push failed {e.status_code}: {e.error.message}")
 
 # ────────────────────────────────────────
-#  ルーティング
+#  Routes
 # ────────────────────────────────────────
 @app.route("/", methods=["GET"])
 def health_check():
@@ -104,7 +102,7 @@ def notify():
     return "Notified", 200
 
 # ────────────────────────────────────────
-#  ローカル実行用
+#  Local run
 # ────────────────────────────────────────
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))

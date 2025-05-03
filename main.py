@@ -47,7 +47,8 @@ def check_boatrace_and_notify():
 
     soup = BeautifulSoup(res.text, "html.parser")
     # 開催中レースに .is-active が付く
-    has_race = bool(soup.select_one(".is-active"))
+
+has_race = bool(soup.select_one(".is-holding"))
 
     # --- 重複送信を 30 分抑止 ---
     cache_path = "/tmp/boat_cache.txt"

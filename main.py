@@ -52,12 +52,23 @@ def requests_retry_session(
     return session
 
 # ────────────────────────────────────────
+#  Helper: detect '福岡' in text or attributes
+# ────────────────────────────────────────
+def has_fukuoka(soup: BeautifulSoup) -> bool:
+    """ページのテキスト or src/alt/title 属性に '福岡' を含むか"""
+    # テキストノード
+    if soup.find(string=lambda t: "福岡" in t):
+        return True
+    # src・alt・title 属性
+    if soup.select_one('[src*="福岡"], [alt*="福岡"], [title*="福岡"]'):
+        return True
+    return False
+
+# ────────────────────────────────────────
 #  Main logic
 # ────────────────────────────────────────
 def check_boatrace_and_notify() -> None:
-    today_dt = datetime.now(TZ)
-    today_human = today_dt.strftime("%Y-%m-%d")   # 2025‑05‑03
-
+    today_human = datetime.now(TZ).strftime("%Y-%m-%d")   # 2025‑05‑03
     url = "https://www.boatrace.jp/owpc/pc/race/pay"
 
     try:
@@ -68,8 +79,7 @@ def check_boatrace_and_notify() -> None:
         return
 
     soup = BeautifulSoup(res.text, "html.parser")
-    # ページ全文に福岡が含まれるか
-    has_race = "福岡" in soup.get_text()
+    has_race = has_fukuoka(soup)
 
     # ── 30 分以内の重複送信を抑止 ──
     cache_path = "/tmp/boat_cache.txt"
